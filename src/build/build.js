@@ -76,6 +76,7 @@ async function runBuild() {
       plugins: [nodeModulesPolyfillPlugin(), urlResolvePlugin],
       minify: true, // Set to true for a smaller production bundle
       sourcemap: true,
+      treeShaking: true,
       // This is crucial for tree-sitter: it prevents esbuild 
       // from trying to resolve node-specific globals
       define: {
