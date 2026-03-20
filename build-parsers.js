@@ -165,14 +165,28 @@ async function main() {
     JSON.stringify({ name: "ts-build-tmp", version: "0.0.0", private: true }, null, 2)
   )
 
-  // Install tree-sitter-cli explicitly so we control the version + get the binary
-  const allPkgs = ["tree-sitter-cli", ...uniqueNpm]
-  const installRes = sh(
-    `npm install --no-save --legacy-peer-deps ${allPkgs.join(" ")}`,
+  // Step 1: install tree-sitter-cli WITH scripts so its postinstall
+  // downloads the prebuilt binary
+  console.log("   Installing tree-sitter-cli …")
+  const cliRes = sh(
+    `npm install --no-save --legacy-peer-deps tree-sitter-cli`,
     tmpDir
   )
-  if (installRes.status !== 0) {
-    console.error("❌ npm install failed")
+  if (cliRes.status !== 0) {
+    console.error("❌ tree-sitter-cli install failed")
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+    process.exit(1)
+  }
+
+  // Step 2: install grammar packages with --ignore-scripts to skip node-gyp
+  // (we only need the grammar source files, not native Node bindings)
+  console.log(`   Installing ${uniqueNpm.length} grammar package(s) …`)
+  const grammarRes = sh(
+    `npm install --no-save --legacy-peer-deps --ignore-scripts ${uniqueNpm.join(" ")}`,
+    tmpDir
+  )
+  if (grammarRes.status !== 0) {
+    console.error("❌ grammar install failed")
     fs.rmSync(tmpDir, { recursive: true, force: true })
     process.exit(1)
   }
