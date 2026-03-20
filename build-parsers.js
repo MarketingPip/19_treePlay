@@ -143,7 +143,7 @@ async function main() {
   )
 
   const installResult = run(
-    `npm install --no-save --prefer-offline ${uniqueNpm.join(" ")}`,
+    `npm install --no-save --legacy-peer-deps --prefer-offline ${uniqueNpm.join(" ")}`,
     tmpDir
   )
   if (installResult.status !== 0) {
