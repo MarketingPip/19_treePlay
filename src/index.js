@@ -41,7 +41,7 @@ export function walk(node, visitors) {
 
 
 
-async function createParser(Grammar){
+export async function createParser(Grammar){
   const parser = await _createParser(rustGrammar);
 
   const originalParse = parser.parse;
