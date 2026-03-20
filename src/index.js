@@ -23,10 +23,10 @@ function generateCdnMap(langs, version, repoName) {
  
 const repo = `MarketingPipeline/${pkg.name}`;
 
-const languages = BUILTIN_GRAMMARS.map(g => g.lang);
+const _languages = BUILTIN_GRAMMARS.map(g => g.lang);
 
 
-const cdnUrls = generateCdnMap(languages, pkg.version, repo);
+const cdnUrls = generateCdnMap(_languages, pkg.version, repo);
 
 export const languages = cdnUrls;
 
