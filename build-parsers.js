@@ -43,7 +43,7 @@ const GRAMMARS = [
   { lang: "ocaml",       npm: "tree-sitter-ocaml"       },
   { lang: "php",         npm: "tree-sitter-php"         },
   { lang: "python",      npm: "tree-sitter-python"      },
-  { lang: "r",           npm: "tree-sitter-r"           },
+  { lang: "r",           npm: "@davisvaughan/tree-sitter-r"           },
   { lang: "ruby",        npm: "tree-sitter-ruby"        },
   { lang: "rust",        npm: "tree-sitter-rust"        },
   { lang: "scala",       npm: "tree-sitter-scala"       },
