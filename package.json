@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "./src/build-vfs.mjs",
     "tree-sitter": "tree-sitter",
     "build:wasm": "tree-sitter build --wasm",
     "build:all": "node build-parsers.js",
