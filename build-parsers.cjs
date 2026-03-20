@@ -13,10 +13,10 @@
  *   node build-parsers.js python rust  # specific langs only
  */
 
-const { execSync, spawnSync } = require("child_process")
-const fs   = require("fs")
-const path = require("path")
-const os   = require("os")
+import { execSync, spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import os from 'node:os';
 
 // ─── Grammar registry ────────────────────────────────────────────────────────
 // `alts`: fallback npm packages tried in order when the primary has no
