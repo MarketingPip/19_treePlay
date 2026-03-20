@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "type": "module",
   "description": "Automated WASM build pipeline for Tree-sitter grammars",
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
+  "main": "./dist/tree-morph.min.js",
+  "module": "./dist/tree-morph.min.js",
   "exports": {
-    ".": "./dist/index.js"
+    ".": "./dist/tree-morph.min.js"
   },
   "scripts": {
     "build": "node ./src/build-vfs.js",
