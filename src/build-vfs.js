@@ -1,12 +1,20 @@
 import * as esbuild from 'esbuild';
 
 // Simple plugin to redirect imports to esm.sh
-const esmShimPlugin = {
-  name: 'esm-sh-plugin',
+const urlResolvePlugin = {
+  name: 'url-resolve-plugin',
   setup(build) {
-    // Intercept all imports that don't start with ./ or /
+    // Intercept anything starting with http:// or https://
+    build.onResolve({ filter: /^https?:\/\// }, args => {
+      return { 
+        path: args.path, 
+        external: true 
+      };
+    });
+
+    // Also handle bare imports if you want them to go to esm.sh
     build.onResolve({ filter: /^[^./]|^\.[^./]|^\.\.\// }, args => {
-      // If it's a bare module specifier (like 'lodash' or 'tree-sitter')
+      // If it's a standard package name, redirect it
       if (!args.path.startsWith('.') && !args.path.startsWith('/')) {
         return { 
           path: `https://esm.sh/${args.path}`, 
@@ -28,7 +36,7 @@ async function runBuild() {
       outfile: 'dist/index.js',
       platform: 'browser', // or 'node' depending on your target
       target: 'es2022',
-      plugins: [esmShimPlugin],
+      plugins: [urlResolvePlugin],
       minify: false, // Set to true for production
       sourcemap: true,
     });
