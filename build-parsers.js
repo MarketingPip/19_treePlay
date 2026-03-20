@@ -3,11 +3,10 @@
  * build-parsers.js
  *
  * Installs tree-sitter grammar npm packages, grabs their pre-built .wasm
- * files (which modern grammar packages ship directly), and emits self-decoding
- * ES modules into ./main/<lang>.js
+ * files, and emits self-decoding ES modules into ./main/<lang>.js
  *
- * Falls back to `tree-sitter build --wasm` for any package that doesn't
- * ship a pre-built wasm (requires Emscripten on PATH for those).
+ * Falls back to `tree-sitter build --wasm` for packages without pre-built
+ * wasm (requires Emscripten on PATH for those).
  *
  * Usage:
  *   node build-parsers.js              # build all
@@ -70,36 +69,38 @@ function gitHead(dir) {
   catch { return "main" }
 }
 
+function makeTmp(prefix) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), prefix))
+  fs.writeFileSync(
+    path.join(dir, "package.json"),
+    JSON.stringify({ name: prefix.replace(/-$/, ""), version: "0.0.0", private: true }, null, 2)
+  )
+  return dir
+}
+
 /**
- * Search dir (non-recursively into node_modules) for a .wasm file.
- * Prefers tree-sitter-<hint>.wasm, falls back to any .wasm.
+ * Recursively find a .wasm file under dir (skipping node_modules).
+ * Prefers tree-sitter-<hint>.wasm, returns any .wasm as fallback.
  */
 function findWasm(dir, hint) {
   const preferred = `tree-sitter-${hint}.wasm`
+  let fallback = null
 
   function walk(d, depth = 0) {
-    let fallback = null
     for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const full = path.join(d, e.name)
       if (e.isFile()) {
-        if (e.name === preferred)           return path.join(d, e.name)
-        if (e.name.endsWith(".wasm"))       fallback = path.join(d, e.name)
+        if (e.name === preferred)     return full
+        if (e.name.endsWith(".wasm")) fallback = fallback ?? full
       } else if (e.isDirectory() && depth < 3 && e.name !== "node_modules") {
-        const found = walk(path.join(d, e.name), depth + 1)
-        if (found && found.endsWith(preferred)) return found
-        if (found && !fallback)             fallback = found
+        const r = walk(full, depth + 1)
+        if (r) return r
       }
     }
-    return fallback
+    return null
   }
-  return walk(dir)
-}
 
-/** Find the tree-sitter CLI binary in a node_modules tree */
-function findCli(tmpDir) {
-  const bin = path.join(tmpDir, "node_modules", ".bin",
-    process.platform === "win32" ? "tree-sitter.cmd" : "tree-sitter")
-  if (fs.existsSync(bin)) return bin
-  return null
+  return walk(dir) ?? fallback
 }
 
 /** Emit a self-decoding ES module — consumers get a Uint8Array of wasm bytes */
@@ -139,75 +140,75 @@ async function main() {
   const commitHash = gitHead(rootDir)
   const uniqueNpm  = [...new Set(targets.map(g => g.npm))]
 
-  // ── 1. Temp workspace ────────────────────────────────────────────────────
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ts-grammars-"))
-  console.log(`\n📦 Installing into ${tmpDir} …\n`)
+  // ── 1. Install tree-sitter-cli into its OWN isolated dir ─────────────────
+  //    Keeping it separate prevents npm from removing grammar packages when
+  //    it re-resolves peer deps during a mixed install.
+  const cliDir = makeTmp("ts-cli-")
+  console.log(`\n🔧 Installing tree-sitter-cli into ${cliDir} …`)
+  const cliRes = sh(`npm install --no-save tree-sitter-cli`, cliDir)
+  if (cliRes.status !== 0) {
+    console.error("❌ tree-sitter-cli install failed — fallback builds won't work")
+    // non-fatal: grammars with pre-built wasm will still succeed
+  }
 
-  fs.writeFileSync(
-    path.join(tmpDir, "package.json"),
-    JSON.stringify({ name: "ts-build-tmp", version: "0.0.0", private: true }, null, 2)
-  )
+  const cliBinName = process.platform === "win32" ? "tree-sitter.cmd" : "tree-sitter"
+  const cliBin = path.join(cliDir, "node_modules", ".bin", cliBinName)
+  const cliAvailable = fs.existsSync(cliBin)
+  if (cliAvailable) {
+    try { fs.chmodSync(cliBin, 0o755) } catch {}
+    console.log(`   ✅ CLI binary: ${cliBin}\n`)
+  } else {
+    console.warn(`   ⚠️  CLI binary not found — packages without pre-built wasm will fail\n`)
+  }
 
-  // ── 2. Install grammars (ignore scripts = skip node-gyp) ─────────────────
-  console.log(`   Installing ${uniqueNpm.length} grammar package(s) …`)
+  // ── 2. Install grammars in their own isolated dir (--ignore-scripts) ──────
+  const grammarDir = makeTmp("ts-grammars-")
+  console.log(`📦 Installing ${uniqueNpm.length} grammar package(s) into ${grammarDir} …\n`)
+
   const grammarRes = sh(
     `npm install --no-save --legacy-peer-deps --ignore-scripts ${uniqueNpm.join(" ")}`,
-    tmpDir
+    grammarDir
   )
   if (grammarRes.status !== 0) {
     console.error("❌ grammar install failed")
-    fs.rmSync(tmpDir, { recursive: true, force: true })
+    fs.rmSync(cliDir,     { recursive: true, force: true })
+    fs.rmSync(grammarDir, { recursive: true, force: true })
     process.exit(1)
   }
 
-  // ── 3. Check if any packages are missing pre-built wasm (need CLI build) ─
-  //    We'll determine this per-lang below; only install CLI if needed.
-  let cliBin = null
-
-  const ensureCli = () => {
-    if (cliBin) return true
-    console.log("\n   Installing tree-sitter-cli for fallback builds …")
-    const r = sh(`npm install --no-save tree-sitter-cli`, tmpDir)
-    if (r.status !== 0) return false
-    cliBin = findCli(tmpDir)
-    if (cliBin) try { fs.chmodSync(cliBin, 0o755) } catch {}
-    return !!cliBin
-  }
-
-  // ── 4. Process each grammar ───────────────────────────────────────────────
+  // ── 3. Process each grammar ───────────────────────────────────────────────
   const results = { ok: [], builtFromSource: [], failed: [] }
 
   for (const { lang, npm } of targets) {
-    console.log(`\n${"─".repeat(60)}`)
+    console.log(`${"─".repeat(60)}`)
     console.log(`🔍 ${lang}  (${npm})`)
 
-    const pkgDir = path.join(tmpDir, "node_modules", npm)
+    const pkgDir = path.join(grammarDir, "node_modules", npm)
     if (!fs.existsSync(pkgDir)) {
       console.error(`   ❌ Package dir not found: ${pkgDir}`)
       results.failed.push({ lang, reason: "package dir missing" })
       continue
     }
 
-    // Sub-grammar dir (e.g. tree-sitter-typescript/tsx)
+    // Handle sub-grammar dirs (e.g. tree-sitter-typescript/{typescript,tsx})
     const npmBase  = npm.replace(/^tree-sitter-/, "")
     const buildDir = (lang !== npmBase && fs.existsSync(path.join(pkgDir, lang)))
       ? path.join(pkgDir, lang)
       : pkgDir
 
-    // ── Try pre-built wasm first ──────────────────────────────────────────
+    // ── Try pre-built wasm ────────────────────────────────────────────────
     let wasmPath = findWasm(buildDir, lang)
-    // also check the package root if we descended into a subdir
     if (!wasmPath && buildDir !== pkgDir) wasmPath = findWasm(pkgDir, lang)
 
     if (wasmPath) {
-      console.log(`   ✅ Pre-built wasm: ${path.relative(tmpDir, wasmPath)}`)
+      console.log(`   ✅ Pre-built wasm found`)
     } else {
-      // ── Fall back: build from source ─────────────────────────────────────
-      console.log(`   ⚙️  No pre-built wasm, building from source …`)
+      // ── Fallback: build from source ───────────────────────────────────
+      console.log(`   ⚙️  No pre-built wasm — building from source …`)
 
-      if (!ensureCli()) {
-        console.error(`   ❌ tree-sitter-cli unavailable, cannot build ${lang}`)
-        results.failed.push({ lang, reason: "cli unavailable" })
+      if (!cliAvailable) {
+        console.error(`   ❌ tree-sitter-cli unavailable`)
+        results.failed.push({ lang, reason: "cli unavailable, no pre-built wasm" })
         continue
       }
 
@@ -217,9 +218,10 @@ async function main() {
         env: process.env,
       })
 
-      if (buildRes.status !== 0) {
-        console.error(`   ❌ Build failed (exit ${buildRes.status})`)
-        results.failed.push({ lang, reason: `build exit ${buildRes.status}` })
+      if (buildRes.status !== 0 || buildRes.signal) {
+        const why = buildRes.signal ? `signal ${buildRes.signal}` : `exit ${buildRes.status}`
+        console.error(`   ❌ Build failed (${why})`)
+        results.failed.push({ lang, reason: `build ${why}` })
         continue
       }
 
@@ -237,23 +239,22 @@ async function main() {
     const outJs = path.join(mainDir, `${lang}.js`)
     fs.writeFileSync(outJs, emitJs(buf, lang))
 
-    const kb    = (buf.length / 1024).toFixed(0)
-    const camel = toCamelCase(lang)
-    console.log(`   📦 main/${lang}.js  (${kb} KB)`)
-    console.log(`   🔗 import ${camel} from "https://github.com/jeff-hykin/common_tree_sitter_languages/raw/${commitHash}/main/${lang}.js"`)
+    console.log(`   📦 main/${lang}.js  (${(buf.length / 1024).toFixed(0)} KB)`)
+    console.log(`   🔗 import ${toCamelCase(lang)} from "https://github.com/jeff-hykin/common_tree_sitter_languages/raw/${commitHash}/main/${lang}.js"`)
     results.ok.push(lang)
   }
 
-  // ── 5. Cleanup ────────────────────────────────────────────────────────────
+  // ── 4. Cleanup ─────────────────────────────────────────────────────────────
   console.log(`\n${"─".repeat(60)}`)
   console.log("🧹 Cleaning up …")
-  fs.rmSync(tmpDir, { recursive: true, force: true })
+  fs.rmSync(cliDir,     { recursive: true, force: true })
+  fs.rmSync(grammarDir, { recursive: true, force: true })
 
-  // ── 6. Summary ────────────────────────────────────────────────────────────
+  // ── 5. Summary ─────────────────────────────────────────────────────────────
   console.log(`\n${"═".repeat(60)}`)
   console.log(`✅ Built (${results.ok.length}): ${results.ok.join(", ") || "none"}`)
   if (results.builtFromSource.length)
-    console.log(`⚙️  From source (needed Emscripten): ${results.builtFromSource.join(", ")}`)
+    console.log(`⚙️  From source: ${results.builtFromSource.join(", ")}`)
   if (results.failed.length) {
     console.log(`❌ Failed (${results.failed.length}):`)
     for (const { lang, reason } of results.failed)
