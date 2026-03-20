@@ -89,7 +89,7 @@ const BUILTIN_GRAMMARS = [
   { lang: "just",                                                                gh: "https://github.com/IndianBoy42/tree-sitter-just"                 },
   { lang: "kdl",                                                                 gh: "https://github.com/amaanq/tree-sitter-kdl"                       },
   { lang: "kotlin",             npm: "tree-sitter-kotlin",                      gh: "https://github.com/fwcd/tree-sitter-kotlin"                      },
-  { lang: "latex",                                                               gh: "https://github.com/latex-lsp/tree-sitter-latex"                  },
+  { lang: "latex",                                                               npm: "@pfoerster/tree-sitter-latex"                  },
   { lang: "ledger",                                                              gh: "https://github.com/cbarrete/tree-sitter-ledger"                  },
   { lang: "liquid",                                                              gh: "https://github.com/hankthetank27/tree-sitter-liquid"             },
   { lang: "llvm",                                                                gh: "https://github.com/benwilliamgraham/tree-sitter-llvm"            },
