@@ -30,7 +30,7 @@ const WASM_INCOMPATIBLE_MSG = "isn't available to Wasm parsers"
 // Each entry: { lang, npm?, gh? }
 // npm takes priority over gh when both are present.
 // gh is a GitHub (or any git) URL — cloned and built with tree-sitter build --wasm.
-const BUILTIN_GRAMMARS = [
+export const BUILTIN_GRAMMARS = [
   { lang: "ada",                                                                 gh: "https://github.com/briot/tree-sitter-ada"                        },
   { lang: "agda",                                                                gh: "https://github.com/tree-sitter/tree-sitter-agda"                 },
   { lang: "angular",                                                             gh: "https://github.com/dlvandenberg/tree-sitter-angular"             },
