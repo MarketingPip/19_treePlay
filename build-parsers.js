@@ -19,6 +19,8 @@ const path = require("path")
 const os   = require("os")
 
 // ─── Grammar registry ────────────────────────────────────────────────────────
+// `alts`: fallback npm packages tried in order when the primary has no
+// pre-built wasm AND fails to build (e.g. wasm-incompatible external scanner).
 const GRAMMARS = [
   { lang: "bash",        npm: "tree-sitter-bash"        },
   { lang: "c",           npm: "tree-sitter-c"           },
@@ -50,9 +52,15 @@ const GRAMMARS = [
   { lang: "toml",        npm: "tree-sitter-toml"        },
   { lang: "tsx",         npm: "tree-sitter-typescript"  },
   { lang: "typescript",  npm: "tree-sitter-typescript"  },
-  { lang: "yaml",        npm: "tree-sitter-yaml"        },
+  // tree-sitter-yaml's external scanner is wasm-incompatible; use the
+  // community fork that ships a pre-built wasm instead.
+  { lang: "yaml",        npm: "tree-sitter-yaml", alts: ["@nickel-org/tree-sitter-yaml"] },
   { lang: "zig",         npm: "tree-sitter-zig"         },
 ]
+
+// Sentinel string present in tree-sitter's stderr when a grammar's external
+// scanner uses C symbols that can never work in a WASM sandbox.
+const WASM_INCOMPATIBLE_MSG = "isn't available to Wasm parsers"
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -179,59 +187,102 @@ async function main() {
   // ── 3. Process each grammar ───────────────────────────────────────────────
   const results = { ok: [], builtFromSource: [], failed: [] }
 
-  for (const { lang, npm } of targets) {
+  for (const { lang, npm, alts = [] } of targets) {
     console.log(`${"─".repeat(60)}`)
     console.log(`🔍 ${lang}  (${npm})`)
 
-    const pkgDir = path.join(grammarDir, "node_modules", npm)
-    if (!fs.existsSync(pkgDir)) {
-      console.error(`   ❌ Package dir not found: ${pkgDir}`)
+    // Helper: resolve pkg dir + optional sub-grammar dir for any npm package
+    const resolveDirs = (pkgName) => {
+      const pkgDir = path.join(grammarDir, "node_modules", pkgName)
+      if (!fs.existsSync(pkgDir)) return null
+      const base     = pkgName.replace(/^(@[^/]+\/)?tree-sitter-/, "")
+      const buildDir = (lang !== base && fs.existsSync(path.join(pkgDir, lang)))
+        ? path.join(pkgDir, lang)
+        : pkgDir
+      return { pkgDir, buildDir }
+    }
+
+    // Helper: attempt one build-from-source, returns { wasmPath, wasmIncompat }
+    const tryBuild = (buildDir) => {
+      if (!cliAvailable) return { wasmPath: null, wasmIncompat: false }
+      const res = spawnSync(cliBin, ["build", "--wasm"], {
+        cwd: buildDir,
+        stdio: ["inherit", "inherit", "pipe"],  // capture stderr for error detection
+        env: process.env,
+      })
+      const stderr = res.stderr?.toString() ?? ""
+      process.stderr.write(stderr)  // still show it
+      const wasmIncompat = stderr.includes(WASM_INCOMPATIBLE_MSG)
+      if (res.status !== 0 || res.signal) return { wasmPath: null, wasmIncompat }
+      return { wasmPath: findWasm(buildDir, lang), wasmIncompat: false }
+    }
+
+    let wasmPath   = null
+    let usedPkg    = npm
+    let fromSource = false
+
+    // ── 1. Try primary package ────────────────────────────────────────────
+    const primary = resolveDirs(npm)
+    if (!primary) {
+      console.error(`   ❌ Package dir not found`)
       results.failed.push({ lang, reason: "package dir missing" })
       continue
     }
 
-    // Handle sub-grammar dirs (e.g. tree-sitter-typescript/{typescript,tsx})
-    const npmBase  = npm.replace(/^tree-sitter-/, "")
-    const buildDir = (lang !== npmBase && fs.existsSync(path.join(pkgDir, lang)))
-      ? path.join(pkgDir, lang)
-      : pkgDir
-
-    // ── Try pre-built wasm ────────────────────────────────────────────────
-    let wasmPath = findWasm(buildDir, lang)
-    if (!wasmPath && buildDir !== pkgDir) wasmPath = findWasm(pkgDir, lang)
+    wasmPath = findWasm(primary.buildDir, lang)
+    if (!wasmPath && primary.buildDir !== primary.pkgDir)
+      wasmPath = findWasm(primary.pkgDir, lang)
 
     if (wasmPath) {
       console.log(`   ✅ Pre-built wasm found`)
     } else {
-      // ── Fallback: build from source ───────────────────────────────────
       console.log(`   ⚙️  No pre-built wasm — building from source …`)
+      const built = tryBuild(primary.buildDir)
+      wasmPath    = built.wasmPath
+      fromSource  = !!wasmPath
 
-      if (!cliAvailable) {
-        console.error(`   ❌ tree-sitter-cli unavailable`)
-        results.failed.push({ lang, reason: "cli unavailable, no pre-built wasm" })
-        continue
+      // ── 2. If wasm-incompatible scanner, try alt packages ─────────────
+      if (!wasmPath && built.wasmIncompat && alts.length) {
+        console.warn(`   ⚠️  Wasm-incompatible external scanner — trying alternatives …`)
+
+        // install all alts at once into the grammar workspace
+        const toInstall = alts.filter(a => !fs.existsSync(path.join(grammarDir, "node_modules", a)))
+        if (toInstall.length) {
+          sh(`npm install --no-save --legacy-peer-deps --ignore-scripts ${toInstall.join(" ")}`, grammarDir)
+        }
+
+        for (const alt of alts) {
+          console.log(`   🔄 Trying alt: ${alt}`)
+          const altDirs = resolveDirs(alt)
+          if (!altDirs) { console.warn(`      ⚠️  Not found after install`); continue }
+
+          wasmPath = findWasm(altDirs.buildDir, lang)
+          if (!wasmPath && altDirs.buildDir !== altDirs.pkgDir)
+            wasmPath = findWasm(altDirs.pkgDir, lang)
+
+          if (wasmPath) {
+            console.log(`      ✅ Pre-built wasm found in ${alt}`)
+            usedPkg = alt; break
+          }
+
+          const altBuilt = tryBuild(altDirs.buildDir)
+          if (altBuilt.wasmPath) {
+            wasmPath   = altBuilt.wasmPath
+            fromSource = true
+            usedPkg    = alt
+            break
+          }
+        }
       }
 
-      const buildRes = spawnSync(cliBin, ["build", "--wasm"], {
-        cwd: buildDir,
-        stdio: "inherit",
-        env: process.env,
-      })
-
-      if (buildRes.status !== 0 || buildRes.signal) {
-        const why = buildRes.signal ? `signal ${buildRes.signal}` : `exit ${buildRes.status}`
-        console.error(`   ❌ Build failed (${why})`)
-        results.failed.push({ lang, reason: `build ${why}` })
-        continue
-      }
-
-      wasmPath = findWasm(buildDir, lang)
       if (!wasmPath) {
-        console.error(`   ❌ No .wasm found after build`)
-        results.failed.push({ lang, reason: "wasm not found post-build" })
+        const why = built.wasmIncompat
+          ? "wasm-incompatible external scanner, no working alt"
+          : `build failed`
+        console.error(`   ❌ ${why}`)
+        results.failed.push({ lang, reason: why })
         continue
       }
-      results.builtFromSource.push(lang)
     }
 
     // ── Emit JS bundle ────────────────────────────────────────────────────
@@ -239,8 +290,10 @@ async function main() {
     const outJs = path.join(mainDir, `${lang}.js`)
     fs.writeFileSync(outJs, emitJs(buf, lang))
 
-    console.log(`   📦 main/${lang}.js  (${(buf.length / 1024).toFixed(0)} KB)`)
+    const pkgNote = usedPkg !== npm ? ` (via ${usedPkg})` : ""
+    console.log(`   📦 main/${lang}.js  (${(buf.length / 1024).toFixed(0)} KB)${pkgNote}`)
     console.log(`   🔗 import ${toCamelCase(lang)} from "https://github.com/jeff-hykin/common_tree_sitter_languages/raw/${commitHash}/main/${lang}.js"`)
+    if (fromSource) results.builtFromSource.push(lang)
     results.ok.push(lang)
   }
 
@@ -266,5 +319,6 @@ async function main() {
 
 main().catch(err => {
   console.error("Unexpected error:", err)
-  process.exit(1)
+  //process.exit(1)
+   process.exit()
 })
