@@ -3,6 +3,8 @@ import fs from 'fs';
 import path from 'path';
 import { nodeModulesPolyfillPlugin } from "esbuild-plugins-node-modules-polyfill";
 // 1. Setup the plugin to handle remote URLs and esm.sh redirects
+ 
+// 1. Setup the plugin to handle remote URLs and esm.sh redirects
 const urlResolvePlugin = {
   name: 'url-resolve-plugin',
   setup(build) {
@@ -23,14 +25,14 @@ const urlResolvePlugin = {
     });
 
     // Bare imports → esm.sh
-    build.onResolve({ filter: /^[^./]/ }, (args) => {
+    /*build.onResolve({ filter: /^[^./]/ }, (args) => {
       if (args.kind === 'entry-point') return;
 
       return {
         path: `https://esm.sh/${args.path}`,
         namespace: 'http-url',
       };
-    });
+    });*/ 
 
     // Load remote files
     build.onLoad({ filter: /.*/, namespace: 'http-url' }, async (args) => {
