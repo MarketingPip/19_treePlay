@@ -131,7 +131,7 @@ async function main() {
     process.exit(1)
   }
 
-  const rootDir = path.resolve(__dirname)
+  const rootDir = process.cwd()
   const mainDir = path.join(rootDir, "main")
   if (!fs.existsSync(mainDir)) fs.mkdirSync(mainDir, { recursive: true })
 
@@ -163,16 +163,7 @@ async function main() {
   const commitHash = gitHead(rootDir)
   const uniqueNpm  = [...new Set(targets.flatMap(g => [g.npm, ...(g.alts ?? [])]))]
 
-  // ── 1. Install tree-sitter-cli ──────────────────────────────────────────
-  const cliDir = makeTmp("ts-cli-")
-  console.log(`\n🔧 Installing tree-sitter-cli into ${cliDir} …`)
-  sh(`npm install --no-save tree-sitter-cli`, cliDir)
-
-  const cliBinName = process.platform === "win32" ? "tree-sitter.cmd" : "tree-sitter"
-  const cliBin = path.join(cliDir, "node_modules", ".bin", cliBinName)
-  const cliAvailable = fs.existsSync(cliBin)
-
-  // ── 2. Install grammars ─────────────────────────────────────────────────
+  // ── 1. Install grammars ─────────────────────────────────────────────────
   const grammarDir = makeTmp("ts-grammars-")
   console.log(`📦 Installing ${uniqueNpm.length} grammar package(s) …\n`)
   const grammarRes = sh(`npm install --no-save --legacy-peer-deps --ignore-scripts ${uniqueNpm.join(" ")}`, grammarDir)
@@ -180,6 +171,27 @@ async function main() {
   if (grammarRes.status !== 0) {
     console.error("❌ grammar install failed")
     process.exit(1)
+  }
+
+  // ── 2. Check which targets need a source build, install cli only if needed ─
+  const needsSourceBuild = targets.filter(({ lang, npm, alts = [] }) => {
+    const pkgDir = path.join(grammarDir, "node_modules", npm)
+    return !findWasm(pkgDir, lang)
+  })
+
+  let cliBin = null
+  let cliDir = null
+  let cliAvailable = false
+
+  if (needsSourceBuild.length) {
+    cliDir = makeTmp("ts-cli-")
+    console.log(`\n🔧 Installing tree-sitter-cli (needed for: ${needsSourceBuild.map(g => g.lang).join(", ")}) …`)
+    sh(`npm install --no-save tree-sitter-cli`, cliDir)
+    const cliBinName = process.platform === "win32" ? "tree-sitter.cmd" : "tree-sitter"
+    cliBin = path.join(cliDir, "node_modules", ".bin", cliBinName)
+    cliAvailable = fs.existsSync(cliBin)
+  } else {
+    console.log(`\n⏭️  Skipping tree-sitter-cli install (all grammars have pre-built wasm)`)
   }
 
   // ── 3. Process each remaining grammar ─────────────────────────────────────
@@ -236,7 +248,7 @@ async function main() {
   }
 
   // ── 4. Cleanup ─────────────────────────────────────────────────────────────
-  fs.rmSync(cliDir, { recursive: true, force: true })
+  if (cliDir) fs.rmSync(cliDir, { recursive: true, force: true })
   fs.rmSync(grammarDir, { recursive: true, force: true })
 
   // ── 5. Summary ─────────────────────────────────────────────────────────────
