@@ -97,3 +97,5 @@ export async function createParser(Grammar) {
 
   return parser;
 }
+
+export {cdnUrls as languages}
