@@ -1,5 +1,29 @@
 import { createParser as _createParser } from "https://deno.land/x/deno_tree_sitter@1.0.1.2/main/main.js";
 import pkg from '../package.json' with { type: 'json' };
+import languages from './build/languages.json' with { type: 'json' };
+
+/**
+ * Generates a mapping of language keys to esm.sh CDN URLs.
+ * * @param {string[]} langs - Array of language keys (e.g., ["javascript", "typescript"])
+ * @param {string} version - The version string (e.g., "1.0.4")
+ * @param {string} repoName - The GitHub repository name (e.g., "jeff-hykin/common_tree_sitter_languages")
+ * @returns {Object} - Mapping of { lang: cdnUrl }
+ */
+function generateCdnMap(langs, version, repoName) {
+  const baseUrl = `https://esm.sh/gh/${repoName}@${version}`;
+  
+  return langs.reduce((acc, lang) => {
+    // Constructing the path to the generated JS files in the /main directory
+    acc[lang] = `${baseUrl}/dist/${lang}.min.js`;
+    return acc;
+  }, {});
+}
+
+
+ 
+const repo = `MarketingPipeline/${pkg.name}`;
+
+const cdnUrls = generateCdnMap(languages, pkg.version, repo);
 
 function toAcornStyle(node) {
   const result = {
