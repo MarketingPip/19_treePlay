@@ -27,16 +27,24 @@ const languages = BUILTIN_GRAMMARS.map(g => g.lang);
 
 const cdnUrls = generateCdnMap(languages, pkg.version, repo);
 
-function toAcornStyle(node) {
+function toAcornStyle(node, parent = null, path = []) {
+  const currentPath = [...path, node.type]; // Add current node type to the breadcrumb
+
   const result = {
-    type:  node.type,
+    type: node.type,
     start: node.startIndex,
-    end:   node.endIndex,
+    end: node.endIndex,
+    parent: parent,
+    path: currentPath, // e.g., ["source_file", "function_declaration", "block", "string_literal"]
   };
+
   if (node.childCount === 0) {
     result.text = node.text;
   } else {
-    result.body = node.children.map(child => toAcornStyle(child));
+    // Pass the current node as parent and the currentPath as the base for children
+    result.body = node.children.map(child => 
+      toAcornStyle(child, result, currentPath)
+    );
   }
   return result;
 }
@@ -62,7 +70,12 @@ export function generateCode(node, source, edits = new Map()) {
 }
 
 export function walk(node, visitors) {
-  visitors[node.type]?.(node);
+  // Pass node and node.parent to the visitor function
+  visitors[node.type]?.(node, node.parent);
+  
+  // Also support a catch-all visitor if you want
+  visitors._default?.(node, node.parent);
+
   node.body?.forEach(child => walk(child, visitors));
 }
 
@@ -79,7 +92,7 @@ export async function createParser(Grammar) {
     const tree = originalParse(code, ...args);
     
     // Transform the resulting Tree/AST to Acorn style
-    return toAcornStyle(tree.rootNode);
+    return toAcornStyle(tree.rootNode, null, []);
   };
 
   return parser;
