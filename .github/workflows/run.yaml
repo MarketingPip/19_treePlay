@@ -30,8 +30,20 @@ jobs:
       - name: Build WASM parsers
         run: node build-parsers.js
 
-      - name: Upload WASM artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: tree-sitter-wasm-parsers
-          path: "**/*.js"
+      - name: Commit and Push JS Bundles
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # Add only the generated JS files in the main directory
+          git add main/*.js
+          
+          # Only commit if there are actually changes to avoid workflow errors
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "chore: update tree-sitter wasm bundles [skip ci]"
+            git push
+          fi
