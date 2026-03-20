@@ -38,7 +38,7 @@ jobs:
           git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
           
           # Add only the generated JS files in the main directory
-          git add main/*.js
+          git add */*.js
           
           # Only commit if there are actually changes to avoid workflow errors
           if git diff --staged --quiet; then
