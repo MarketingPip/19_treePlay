@@ -137,7 +137,7 @@ export const BUILTIN_GRAMMARS = [
   { lang: "unison",                                                              gh: "https://github.com/kylegoetz/tree-sitter-unison"                 },
   { lang: "vala",                                                                gh: "https://github.com/vala-lang/tree-sitter-vala"                   },
   { lang: "verilog",                                                             gh: "https://github.com/tree-sitter/tree-sitter-verilog"              },
-  { lang: "vim",                                                                 gh: "https://github.com/neovim/tree-sitter-vim"                       },
+  // { lang: "vim",                                                                 gh: "https://github.com/neovim/tree-sitter-vim"                       }, too heavy.
   { lang: "vimdoc",                                                              gh: "https://github.com/neovim/tree-sitter-vimdoc"                    },
   { lang: "vue",                                                                 gh: "https://github.com/tree-sitter-grammars/tree-sitter-vue"         },
   { lang: "wgsl",                                                                gh: "https://github.com/szebniok/tree-sitter-wgsl"                    },
