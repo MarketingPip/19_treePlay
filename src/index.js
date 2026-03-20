@@ -1,6 +1,6 @@
 import { createParser as _createParser } from "https://deno.land/x/deno_tree_sitter@1.0.1.2/main/main.js";
 import pkg from '../package.json' with { type: 'json' };
-import languages from './build/languages.json' with { type: 'json' };
+import {BUILTIN_GRAMMARS} from './build/build-parsers.js';
 
 /**
  * Generates a mapping of language keys to esm.sh CDN URLs.
@@ -22,6 +22,8 @@ function generateCdnMap(langs, version, repoName) {
 
  
 const repo = `MarketingPipeline/${pkg.name}`;
+
+const languages = BUILTIN_GRAMMARS.map(g => g.lang);
 
 const cdnUrls = generateCdnMap(languages, pkg.version, repo);
 
