@@ -54,7 +54,7 @@ const GRAMMARS = [
   { lang: "typescript",  npm: "tree-sitter-typescript"  },
   // tree-sitter-yaml's external scanner is wasm-incompatible; use the
   // community fork that ships a pre-built wasm instead.
-  { lang: "yaml",        npm: "tree-sitter-yaml", alts: ["@nickel-org/tree-sitter-yaml"] },
+  { lang: "yaml",        npm: "tree-sitter-yaml"        },
   { lang: "zig",         npm: "tree-sitter-zig"         },
 ]
 
