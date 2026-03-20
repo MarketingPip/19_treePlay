@@ -63,7 +63,7 @@ export const BUILTIN_GRAMMARS = [
   { lang: "erlang",                                                              gh: "https://github.com/WhatsApp/tree-sitter-erlang"                  },
   { lang: "fennel",                                                              gh: "https://github.com/alexmozaidze/tree-sitter-fennel"              },
   { lang: "fish",                                                                gh: "https://github.com/ram02z/tree-sitter-fish"                      },
-  { lang: "fortran",                                                             gh: "https://github.com/stadelmanma/tree-sitter-fortran"              },
+  // { lang: "fortran",                                                             gh: "https://github.com/stadelmanma/tree-sitter-fortran"              },
   { lang: "gdscript",                                                            gh: "https://github.com/PrestonKnopp/tree-sitter-gdscript"            },
   { lang: "gleam",                                                               gh: "https://github.com/gleam-lang/tree-sitter-gleam"                 },
   { lang: "glsl",                                                                gh: "https://github.com/theHamsta/tree-sitter-glsl"                   },
