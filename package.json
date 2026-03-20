@@ -9,7 +9,7 @@
     ".": "./dist/index.js"
   },
   "scripts": {
-    "build": "node ./src/build-vfs.js",
+    "build": "node ./src/build-vfs.cjs",
     "build:wasm": "tree-sitter build --wasm",
     "build:all": "node build-parsers.js",
     "clean": "find . -name '*.wasm' -delete"
