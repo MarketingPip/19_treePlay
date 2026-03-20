@@ -146,7 +146,8 @@ async function main() {
   if (!fs.existsSync(mainDir)) fs.mkdirSync(mainDir, { recursive: true })
 
   const commitHash = gitHead(rootDir)
-  const uniqueNpm  = [...new Set(targets.map(g => g.npm))]
+  // collect primaries + all alts so everything is available for wasm scanning
+  const uniqueNpm  = [...new Set(targets.flatMap(g => [g.npm, ...(g.alts ?? [])]))]
 
   // ── 1. Install tree-sitter-cli into its OWN isolated dir ─────────────────
   //    Keeping it separate prevents npm from removing grammar packages when
@@ -245,12 +246,6 @@ async function main() {
       if (!wasmPath && built.wasmIncompat && alts.length) {
         console.warn(`   ⚠️  Wasm-incompatible external scanner — trying alternatives …`)
 
-        // install all alts at once into the grammar workspace
-        const toInstall = alts.filter(a => !fs.existsSync(path.join(grammarDir, "node_modules", a)))
-        if (toInstall.length) {
-          sh(`npm install --no-save --legacy-peer-deps --ignore-scripts ${toInstall.join(" ")}`, grammarDir)
-        }
-
         for (const alt of alts) {
           console.log(`   🔄 Trying alt: ${alt}`)
           const altDirs = resolveDirs(alt)
@@ -319,6 +314,5 @@ async function main() {
 
 main().catch(err => {
   console.error("Unexpected error:", err)
-  //process.exit(1)
-   process.exit()
+  process.exit(0)
 })
