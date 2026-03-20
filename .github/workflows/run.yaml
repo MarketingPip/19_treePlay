@@ -27,11 +27,8 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Build WASM parsers
-        run: node build-parsers.js
-
       - name: Build Package
-        run: node src/build-vfs.mjs
+        run: npm build
         
       - name: Commit and Push JS Bundles
         env:
