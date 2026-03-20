@@ -14,6 +14,7 @@ export const BUILTIN_GRAMMARS = [
   { lang: "bicep",                                                               gh: "https://github.com/amaanq/tree-sitter-bicep"                     },
   { lang: "c",                  npm: "tree-sitter-c"   },
   { lang: "c-sharp",            npm: "tree-sitter-c-sharp"   },
+  { lang: "wat",            npm: "tree-sitter-wat"   },
   { lang: "cairo",                                                               gh: "https://github.com/amaanq/tree-sitter-cairo"                     },
   { lang: "clojure",                                                             gh: "https://github.com/sogaiu/tree-sitter-clojure"                   },
   { lang: "cmake",                                                               gh: "https://github.com/uyha/tree-sitter-cmake"                       },
@@ -41,6 +42,7 @@ export const BUILTIN_GRAMMARS = [
   { lang: "glsl",                                                                gh: "https://github.com/theHamsta/tree-sitter-glsl"                   },
   { lang: "go",                 npm: "tree-sitter-go",                          gh: "https://github.com/tree-sitter/tree-sitter-go"                   },
   { lang: "gomod",                                                               gh: "https://github.com/camdencheek/tree-sitter-go-mod"               },
+  { lang: "gitignore",                                                                     gh: "https://github.com/shunsambongi/tree-sitter-gitignore" },
   { lang: "graphql",                                                             gh: "https://github.com/bkegley/tree-sitter-graphql"                  },
   { lang: "groovy",                                                              gh: "https://github.com/murtaza64/tree-sitter-groovy"                 },
   { lang: "hack",                                                                gh: "https://github.com/slackhq/tree-sitter-hack"                     },
@@ -116,5 +118,6 @@ export const BUILTIN_GRAMMARS = [
   { lang: "xml",                                                                 gh: "https://github.com/tree-sitter-grammars/tree-sitter-xml"         },
   { lang: "yaml",               npm: "@tree-sitter-grammars/tree-sitter-yaml",  gh: "https://github.com/tree-sitter-grammars/tree-sitter-yaml"        },
   { lang: "yang",                                                                gh: "https://github.com/Hubro/tree-sitter-yang"                       },
+  { lang: "ini",                                                                gh: "https://github.com/justinmk/tree-sitter-ini"                       },
   { lang: "zig",                npm: "tree-sitter-zig",                         gh: "https://github.com/maxxnino/tree-sitter-zig"                     },
 ]
