@@ -27,8 +27,8 @@ jobs:
         with:
           version: 'latest'
 
-      - name: Build Package
-        run: npm run build
+      - name: Build Grammar Package
+        run: npm run build:all
         
       - name: Commit and Push JS Bundles
         env:
@@ -44,6 +44,28 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit"
           else
-            git commit -m "chore: update tree-sitter wasm bundles [skip ci]"
+            git commit -m "chore: update tree-sitter wasm bundles"
             git push
           fi
+
+ 
+      - name: Build Library
+        run: npm run build
+        
+      - name: Commit Library
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          
+          # Add only the generated JS files in the main directory
+          git add */*.js
+          
+          # Only commit if there are actually changes to avoid workflow errors
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Updated dist/tree-morph.min.js 📥"
+            git push
+          fi         
