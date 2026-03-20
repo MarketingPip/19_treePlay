@@ -82,7 +82,7 @@ export function walk(node, visitors) {
   node.body?.forEach(child => walk(child, visitors));
 }
 
-export function walkWithCursor(node, visitors) {
+/* export function walkWithCursor(node, visitors) {
   const cursor = node.walk();
   let reachedRoot = false;
 
@@ -103,7 +103,7 @@ export function walkWithCursor(node, visitors) {
       }
     }
   }
-}
+}*/ 
 
 export async function createParser(Grammar) {
   const parser = await _createParser(Grammar);
