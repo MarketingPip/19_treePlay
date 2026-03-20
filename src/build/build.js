@@ -23,14 +23,14 @@ const urlResolvePlugin = {
     });
 
     // Bare imports → esm.sh
-    /*build.onResolve({ filter: /^[^./]/ }, (args) => {
+    build.onResolve({ filter: /^[^./]/ }, (args) => {
       if (args.kind === 'entry-point') return;
 
       return {
         path: `https://esm.sh/${args.path}`,
         namespace: 'http-url',
       };
-    });*/ 
+    });
 
     // Load remote files
     build.onLoad({ filter: /.*/, namespace: 'http-url' }, async (args) => {
