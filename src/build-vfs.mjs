@@ -52,7 +52,7 @@ const urlResolvePlugin = {
 
 async function runBuild() {
   const outDir = 'dist';
-  const outFile = path.join(outDir, 'index.js');
+  const outFile = path.join(outDir, 'tree-morph.min.js');
 
   console.log("🚀 Starting ESM build...");
 
@@ -72,7 +72,7 @@ async function runBuild() {
       platform: 'browser',
       target: 'es2022',
       plugins: [nodeModulesPolyfillPlugin(), urlResolvePlugin],
-      minify: false, // Set to true for a smaller production bundle
+      minify: true, // Set to true for a smaller production bundle
       sourcemap: true,
       // This is crucial for tree-sitter: it prevents esbuild 
       // from trying to resolve node-specific globals
