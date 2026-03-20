@@ -27,7 +27,7 @@ const GRAMMARS = [
   { lang: "cpp",         npm: "tree-sitter-cpp"         },
   { lang: "c-sharp",     npm: "tree-sitter-c-sharp"     },
   { lang: "css",         npm: "tree-sitter-css"         },
-  //{ lang: "dockerfile",  npm: "tree-sitter-dockerfile"  },
+  // { lang: "dockerfile",  npm: "tree-sitter-dockerfile"  },
   { lang: "elisp",       npm: "tree-sitter-elisp"       },
   { lang: "go",          npm: "tree-sitter-go"          },
   { lang: "haskell",     npm: "tree-sitter-haskell"     },
@@ -43,7 +43,7 @@ const GRAMMARS = [
   { lang: "ocaml",       npm: "tree-sitter-ocaml"       },
   { lang: "php",         npm: "tree-sitter-php"         },
   { lang: "python",      npm: "tree-sitter-python"      },
-  { lang: "r",           npm: "@davisvaughan/tree-sitter-r"           },
+  { lang: "r",           npm: "@davisvaughan/tree-sitter-r" },
   { lang: "ruby",        npm: "tree-sitter-ruby"        },
   { lang: "rust",        npm: "tree-sitter-rust"        },
   { lang: "scala",       npm: "tree-sitter-scala"       },
@@ -54,8 +54,7 @@ const GRAMMARS = [
   { lang: "typescript",  npm: "tree-sitter-typescript"  },
   // tree-sitter-yaml's external scanner is wasm-incompatible; use the
   // community fork that ships a pre-built wasm instead.
-  { lang: "yaml",        npm: "@tree-sitter-grammars/tree-sitter-yaml"        },
-//  { lang: "xml",        npm: "@tree-sitter-grammars/tree-sitter-xml"        },
+  { lang: "yaml",        npm: "@tree-sitter-grammars/tree-sitter-yaml" },
   { lang: "zig",         npm: "tree-sitter-zig"         },
 ]
 
@@ -193,15 +192,39 @@ async function main() {
     console.log(`${"─".repeat(60)}`)
     console.log(`🔍 ${lang}  (${npm})`)
 
-    // Helper: resolve pkg dir + optional sub-grammar dir for any npm package
+    // Helper: resolve pkg dir + the subdir that actually contains grammar.js.
+    // Handles three layouts:
+    //   1. grammar.js at package root  (most packages)
+    //   2. grammar.js in <pkgDir>/<lang>/  (e.g. tree-sitter-typescript)
+    //   3. grammar.js in <pkgDir>/tree-sitter-<lang>/  (e.g. tree-sitter-markdown)
     const resolveDirs = (pkgName) => {
       const pkgDir = path.join(grammarDir, "node_modules", pkgName)
       if (!fs.existsSync(pkgDir)) return null
-      const base     = pkgName.replace(/^(@[^/]+\/)?tree-sitter-/, "")
-      const buildDir = (lang !== base && fs.existsSync(path.join(pkgDir, lang)))
-        ? path.join(pkgDir, lang)
-        : pkgDir
-      return { pkgDir, buildDir }
+
+      // If grammar.js is at the root, use it directly
+      if (fs.existsSync(path.join(pkgDir, "grammar.js")))
+        return { pkgDir, buildDir: pkgDir }
+
+      // Otherwise search one level of subdirs for grammar.js, preferring
+      // a subdir whose name matches lang or tree-sitter-<lang>
+      const subdirs = fs.readdirSync(pkgDir, { withFileTypes: true })
+        .filter(e => e.isDirectory() && e.name !== "node_modules")
+        .map(e => e.name)
+
+      const preferred = [lang, `tree-sitter-${lang}`]
+      const ordered   = [
+        ...preferred.filter(n => subdirs.includes(n)),
+        ...subdirs.filter(n => !preferred.includes(n)),
+      ]
+
+      for (const sub of ordered) {
+        const candidate = path.join(pkgDir, sub)
+        if (fs.existsSync(path.join(candidate, "grammar.js")))
+          return { pkgDir, buildDir: candidate }
+      }
+
+      // No grammar.js found anywhere — still return pkgDir so wasm search works
+      return { pkgDir, buildDir: pkgDir }
     }
 
     // Helper: attempt one build-from-source, returns { wasmPath, wasmIncompat }
@@ -315,5 +338,5 @@ async function main() {
 
 main().catch(err => {
   console.error("Unexpected error:", err)
-  process.exit(0)
+  process.exit(1)
 })
