@@ -38,7 +38,7 @@ const GRAMMARS = [
   { lang: "julia",       npm: "tree-sitter-julia"       },
   { lang: "kotlin",      npm: "tree-sitter-kotlin"      },
   { lang: "lua",         npm: "tree-sitter-lua"         },
-  { lang: "markdown",    npm: "tree-sitter-markdown"    },
+ // { lang: "markdown",    npm: "tree-sitter-markdown"    },
   { lang: "nix",         npm: "tree-sitter-nix"         },
   { lang: "ocaml",       npm: "tree-sitter-ocaml"       },
   { lang: "php",         npm: "tree-sitter-php"         },
