@@ -6,26 +6,33 @@ import path from 'path';
 const urlResolvePlugin = {
   name: 'url-resolve-plugin',
   setup(build) {
-    // Handle full URLs (deno.land, esm.sh, etc.)
-    build.onResolve({ filter: /^https?:\/\// }, (args) => {
-      return {
-        path: args.path,
-        namespace: 'http-url', // important for custom loading
-      };
+    // Resolve full URLs
+    build.onResolve({ filter: /^https?:\/\// }, (args) => ({
+      path: args.path,
+      namespace: 'http-url',
+    }));
+
+    // ✅ FIX: resolve relative imports inside fetched modules
+    build.onResolve({ filter: /^\.+\// }, (args) => {
+      if (args.namespace === 'http-url') {
+        return {
+          path: new URL(args.path, args.importer).toString(),
+          namespace: 'http-url',
+        };
+      }
     });
 
-    // Handle bare module imports (react, lodash, etc.)
-    build.onResolve({ filter: /^[^./]/ }, (args) => {
-      // Ignore entry points (optional but safer)
+    // Bare imports → esm.sh
+    /*build.onResolve({ filter: /^[^./]/ }, (args) => {
       if (args.kind === 'entry-point') return;
 
       return {
         path: `https://esm.sh/${args.path}`,
         namespace: 'http-url',
       };
-    });
+    });*/ 
 
-    // Fetch the remote modules
+    // Load remote files
     build.onLoad({ filter: /.*/, namespace: 'http-url' }, async (args) => {
       const res = await fetch(args.path);
 
@@ -37,7 +44,7 @@ const urlResolvePlugin = {
 
       return {
         contents,
-        loader: 'js', // or infer from content-type if needed
+        loader: 'js',
       };
     });
   },
