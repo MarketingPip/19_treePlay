@@ -41,15 +41,19 @@ export function walk(node, visitors) {
 
 
 
-export async function createParser(Grammar){
+export async function createParser(Grammar) {
   const parser = await _createParser(Grammar);
 
-  const originalParse = parser.parse;
+  // Bind the original method so it keeps its context (this)
+  const originalParse = parser.parse.bind(parser);
 
-  parser.parse = function(code){
-   const AST = originalParse(code);
-   return toAcornStyle(AST);
-  }
+  parser.parse = function(code, ...args) {
+    // Standard Tree-sitter parse returns a Tree object
+    const tree = originalParse(code, ...args);
+    
+    // Transform the resulting Tree/AST to Acorn style
+    return toAcornStyle(tree);
+  };
 
   return parser;
 }
