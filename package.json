@@ -30,6 +30,10 @@
     "parser",
     "grammar"
   ],
+  "files": [
+    "dist",
+    "main"
+  ],
   "author": "Your Name",
   "license": "MIT"
 }
