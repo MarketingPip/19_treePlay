@@ -30,6 +30,9 @@ jobs:
       - name: Build WASM parsers
         run: node build-parsers.js
 
+      - name: Build Package
+        run: node src/build-vfs.mjs
+        
       - name: Commit and Push JS Bundles
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
