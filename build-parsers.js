@@ -1,73 +1,231 @@
-const { execSync } = require('child_process');
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env node
+/**
+ * run/generate.js
+ *
+ * Dynamically fetches every tree-sitter grammar npm package, builds WASM,
+ * and emits a self-decoding ES module into ./main/<lang>.js
+ *
+ * Usage:
+ *   node run/generate.js              # build all
+ *   node run/generate.js python rust  # build specific langs only
+ */
 
-const BUILD_CMD = 'npx tree-sitter build --wasm';
+const { execSync, spawnSync } = require("child_process")
+const fs   = require("fs")
+const path = require("path")
+const os   = require("os")
+
+// ─── Grammar registry ────────────────────────────────────────────────────────
+// Each entry: { lang, npm } where npm is the package name on npm.
+// Add / remove entries here to control which languages are bundled.
+const GRAMMARS = [
+  { lang: "bash",              npm: "tree-sitter-bash"              },
+  { lang: "c",                 npm: "tree-sitter-c"                 },
+  { lang: "cpp",               npm: "tree-sitter-cpp"               },
+  { lang: "c-sharp",           npm: "tree-sitter-c-sharp"           },
+  { lang: "css",               npm: "tree-sitter-css"               },
+  { lang: "dockerfile",        npm: "tree-sitter-dockerfile"        },
+  { lang: "elisp",             npm: "tree-sitter-elisp"             },
+  { lang: "go",                npm: "tree-sitter-go"                },
+  { lang: "haskell",           npm: "tree-sitter-haskell"           },
+  { lang: "html",              npm: "tree-sitter-html"              },
+  { lang: "java",              npm: "tree-sitter-java"              },
+  { lang: "javascript",        npm: "tree-sitter-javascript"        },
+  { lang: "json",              npm: "tree-sitter-json"              },
+  { lang: "julia",             npm: "tree-sitter-julia"             },
+  { lang: "kotlin",            npm: "tree-sitter-kotlin"            },
+  { lang: "lua",               npm: "tree-sitter-lua"               },
+  { lang: "markdown",          npm: "tree-sitter-markdown"          },
+  { lang: "nix",               npm: "tree-sitter-nix"               },
+  { lang: "ocaml",             npm: "tree-sitter-ocaml"             },
+  { lang: "php",               npm: "tree-sitter-php"               },
+  { lang: "python",            npm: "tree-sitter-python"            },
+  { lang: "r",                 npm: "tree-sitter-r"                 },
+  { lang: "ruby",              npm: "tree-sitter-ruby"              },
+  { lang: "rust",              npm: "tree-sitter-rust"              },
+  { lang: "scala",             npm: "tree-sitter-scala"             },
+  { lang: "sql",               npm: "tree-sitter-sql"               },
+  { lang: "swift",             npm: "tree-sitter-swift"             },
+  { lang: "toml",              npm: "tree-sitter-toml"              },
+  { lang: "tsx",               npm: "tree-sitter-typescript"        }, // sub-grammar
+  { lang: "typescript",        npm: "tree-sitter-typescript"        },
+  { lang: "yaml",              npm: "tree-sitter-yaml"              },
+  { lang: "zig",               npm: "tree-sitter-zig"               },
+]
+
+// ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function toCamelCase(str) {
-  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+  return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase())
 }
 
-function buildGrammars(dir) {
-  const mainDir = path.join(dir, 'main');
-  if (!fs.existsSync(mainDir)) fs.mkdirSync(mainDir);
+function run(cmd, cwd, { silent = false } = {}) {
+  return spawnSync(cmd, { cwd, shell: true, stdio: silent ? "pipe" : "inherit" })
+}
 
-  let commitHash = "main";
+function gitHead(repoDir) {
   try {
-    commitHash = execSync('git rev-parse HEAD').toString().trim();
-  } catch (e) {
-    console.warn("⚠️ Not a git repository, using 'main' as fallback hash.");
+    return execSync("git rev-parse HEAD", { cwd: repoDir }).toString().trim()
+  } catch {
+    return "main"
   }
+}
 
-  const files = fs.readdirSync(dir);
-  for (const file of files) {
-    const fullPath = path.join(dir, file);
-
-    if (
-      fs.statSync(fullPath).isDirectory() &&
-      fs.existsSync(path.join(fullPath, 'grammar.js'))
-    ) {
-      console.log(`🔨 Building WASM for: ${file}...`);
-
-      try {
-        execSync(BUILD_CMD, { cwd: fullPath, stdio: 'inherit' });
-
-        const wasmFile = fs.readdirSync(fullPath).find(f => f.endsWith('.wasm'));
-        if (!wasmFile) {
-          console.warn(`⚠️ No .wasm found in ${file} after build.\n`);
-          continue;
-        }
-
-        const wasmPath = path.join(fullPath, wasmFile);
-        const langName = wasmFile.replace('tree-sitter-', '').replace('.wasm', '');
-        const camelName = toCamelCase(langName);
-
-        const wasmBuffer = fs.readFileSync(wasmPath);
-        const base64Data = wasmBuffer.toString('base64');
-
-        // Emit a self-decoding ES module — consumers get a Uint8Array ready
-        // to pass directly to Parser.Language.load()
-        const jsContent = [
-          `// Generated Tree-sitter Parser Bundle — ${langName}`,
-          `const base64 = "${base64Data}";`,
-          `const bytes = Uint8Array.from(atob(base64), c => c.charCodeAt(0));`,
-          `export default bytes;`,
-          `export { bytes };`,
-          '',
-        ].join('\n');
-
-        const outJsPath = path.join(mainDir, `${langName}.js`);
-        fs.writeFileSync(outJsPath, jsContent);
-
-        console.log(`✅ Success: ${file}`);
-        console.log(`📦 Generated: main/${langName}.js`);
-        console.log(`🔗 import ${camelName} from "https://github.com/jeff-hykin/common_tree_sitter_languages/raw/${commitHash}/main/${langName}.js"\n`);
-
-      } catch (err) {
-        console.error(`❌ Failed to build ${file}: ${err.message}\n`);
-      }
+/** Locate a .wasm file anywhere under dir (handles sub-grammars like tsx) */
+function findWasm(dir, hint) {
+  // prefer tree-sitter-<hint>.wasm, fall back to any .wasm
+  const preferred = `tree-sitter-${hint}.wasm`
+  const entries = fs.readdirSync(dir, { withFileTypes: true })
+  for (const e of entries) {
+    if (e.isFile() && e.name === preferred) return path.join(dir, e.name)
+  }
+  for (const e of entries) {
+    if (e.isFile() && e.name.endsWith(".wasm")) return path.join(dir, e.name)
+  }
+  // also check one level deep (some packages nest them)
+  for (const e of entries) {
+    if (e.isDirectory()) {
+      const sub = path.join(dir, e.name)
+      const found = fs.readdirSync(sub).find(f => f.endsWith(".wasm"))
+      if (found) return path.join(sub, found)
     }
   }
+  return null
 }
 
-buildGrammars(process.cwd());
+/** Emit a self-decoding ES module from raw wasm bytes */
+function emitJs(wasmBuffer, langName) {
+  const b64 = wasmBuffer.toString("base64")
+  return [
+    `// Generated Tree-sitter WASM bundle — ${langName}`,
+    `// Auto-generated by run/generate.js — do not edit`,
+    `const b64 = "${b64}";`,
+    `const decode = typeof atob !== "undefined"`,
+    `  ? (s) => atob(s)`,
+    `  : (s) => Buffer.from(s, "base64").toString("binary");`,
+    `const bytes = Uint8Array.from(decode(b64), c => c.charCodeAt(0));`,
+    `export default bytes;`,
+    `export { bytes };`,
+    "",
+  ].join("\n")
+}
+
+// ─── Main ────────────────────────────────────────────────────────────────────
+
+async function main() {
+  const filterArgs = process.argv.slice(2)
+  const targets = filterArgs.length
+    ? GRAMMARS.filter(g => filterArgs.includes(g.lang))
+    : GRAMMARS
+
+  if (!targets.length) {
+    console.error("No matching grammars found for:", filterArgs)
+    process.exit(1)
+  }
+
+  const rootDir = path.resolve(__dirname, "..")
+  const mainDir = path.join(rootDir, "main")
+  if (!fs.existsSync(mainDir)) fs.mkdirSync(mainDir, { recursive: true })
+
+  const commitHash = gitHead(rootDir)
+
+  // Deduplicate npm packages so we only install each once
+  const uniqueNpm = [...new Set(targets.map(g => g.npm))]
+
+  // ── 1. Install all npm packages into a temp workspace ──────────────────────
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "ts-grammars-"))
+  console.log(`\n📦 Installing ${uniqueNpm.length} npm package(s) into ${tmpDir} …\n`)
+
+  // write a minimal package.json so npm install works without warnings
+  fs.writeFileSync(
+    path.join(tmpDir, "package.json"),
+    JSON.stringify({ name: "ts-build-tmp", private: true, dependencies: {} }, null, 2)
+  )
+
+  const installResult = run(
+    `npm install --no-save --prefer-offline ${uniqueNpm.join(" ")}`,
+    tmpDir
+  )
+  if (installResult.status !== 0) {
+    console.error("❌ npm install failed")
+    process.exit(1)
+  }
+
+  // ── 2. Build each grammar ──────────────────────────────────────────────────
+  const results = { ok: [], failed: [] }
+
+  for (const { lang, npm } of targets) {
+    console.log(`\n${"─".repeat(60)}`)
+    console.log(`🔨 Building: ${lang}  (${npm})`)
+
+    const pkgDir = path.join(tmpDir, "node_modules", npm)
+    if (!fs.existsSync(pkgDir)) {
+      console.error(`   ❌ Package dir not found: ${pkgDir}`)
+      results.failed.push({ lang, reason: "package dir missing" })
+      continue
+    }
+
+    // Some packages (tree-sitter-typescript) have sub-grammar dirs
+    // e.g. tree-sitter-typescript/typescript and tree-sitter-typescript/tsx
+    // Detect: if lang !== last segment of npm, look for a subdir
+    const npmBase  = npm.replace("tree-sitter-", "")
+    const buildDir = (lang !== npmBase && fs.existsSync(path.join(pkgDir, lang)))
+      ? path.join(pkgDir, lang)
+      : pkgDir
+
+    // Ensure tree-sitter-cli is available (use npx so no global install needed)
+    const buildCmd = "npx --yes tree-sitter build --wasm"
+    console.log(`   cwd: ${buildDir}`)
+    console.log(`   cmd: ${buildCmd}`)
+
+    const buildResult = run(buildCmd, buildDir)
+    if (buildResult.status !== 0) {
+      console.error(`   ❌ Build failed for ${lang}`)
+      results.failed.push({ lang, reason: "build error" })
+      continue
+    }
+
+    const wasmPath = findWasm(buildDir, lang)
+    if (!wasmPath) {
+      console.error(`   ❌ No .wasm found after build in ${buildDir}`)
+      results.failed.push({ lang, reason: "wasm not found" })
+      continue
+    }
+
+    console.log(`   ✅ WASM: ${wasmPath}`)
+
+    const wasmBuffer = fs.readFileSync(wasmPath)
+    const jsContent  = emitJs(wasmBuffer, lang)
+    const outPath    = path.join(mainDir, `${lang}.js`)
+    fs.writeFileSync(outPath, jsContent)
+
+    const camel = toCamelCase(lang)
+    console.log(`   📦 Written: main/${lang}.js (${(wasmBuffer.length / 1024).toFixed(0)} KB wasm)`)
+    console.log(`   🔗 import ${camel} from "https://github.com/jeff-hykin/common_tree_sitter_languages/raw/${commitHash}/main/${lang}.js"`)
+
+    results.ok.push(lang)
+  }
+
+  // ── 3. Cleanup ─────────────────────────────────────────────────────────────
+  console.log(`\n${"─".repeat(60)}`)
+  console.log("🧹 Cleaning up temp dir …")
+  fs.rmSync(tmpDir, { recursive: true, force: true })
+
+  // ── 4. Summary ─────────────────────────────────────────────────────────────
+  console.log(`\n${"═".repeat(60)}`)
+  console.log(`✅ Built (${results.ok.length}): ${results.ok.join(", ") || "none"}`)
+  if (results.failed.length) {
+    console.log(`❌ Failed (${results.failed.length}):`)
+    for (const { lang, reason } of results.failed) {
+      console.log(`   • ${lang}: ${reason}`)
+    }
+  }
+  console.log(`${"═".repeat(60)}\n`)
+
+  if (results.failed.length) process.exit(1)
+}
+
+main().catch(err => {
+  console.error("Unexpected error:", err)
+  process.exit(1)
+})
