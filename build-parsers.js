@@ -27,7 +27,7 @@ const GRAMMARS = [
   { lang: "cpp",         npm: "tree-sitter-cpp"         },
   { lang: "c-sharp",     npm: "tree-sitter-c-sharp"     },
   { lang: "css",         npm: "tree-sitter-css"         },
-  { lang: "dockerfile",  npm: "tree-sitter-dockerfile"  },
+  //{ lang: "dockerfile",  npm: "tree-sitter-dockerfile"  },
   { lang: "elisp",       npm: "tree-sitter-elisp"       },
   { lang: "go",          npm: "tree-sitter-go"          },
   { lang: "haskell",     npm: "tree-sitter-haskell"     },
@@ -38,7 +38,7 @@ const GRAMMARS = [
   { lang: "julia",       npm: "tree-sitter-julia"       },
   { lang: "kotlin",      npm: "tree-sitter-kotlin"      },
   { lang: "lua",         npm: "tree-sitter-lua"         },
-  { lang: "markdown",    npm: "tree-sitter-markdown"    },
+  { lang: "markdown",    npm: "@tree-sitter-grammars/tree-sitter-markdown"    },
   { lang: "nix",         npm: "tree-sitter-nix"         },
   { lang: "ocaml",       npm: "tree-sitter-ocaml"       },
   { lang: "php",         npm: "tree-sitter-php"         },
@@ -54,7 +54,8 @@ const GRAMMARS = [
   { lang: "typescript",  npm: "tree-sitter-typescript"  },
   // tree-sitter-yaml's external scanner is wasm-incompatible; use the
   // community fork that ships a pre-built wasm instead.
-  { lang: "yaml",        npm: "tree-sitter-yaml"        },
+  { lang: "yaml",        npm: "@tree-sitter-grammars/tree-sitter-yaml"        },
+  { lang: "xml",        npm: "@tree-sitter-grammars/tree-sitter-xml"        },
   { lang: "zig",         npm: "tree-sitter-zig"         },
 ]
 
