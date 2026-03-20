@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import { nodeModulesPolyfillPlugin } from "esbuild-plugins-node-modules-polyfill";
 // 1. Setup the plugin to handle remote URLs and esm.sh redirects
- 
+ import {BUILTIN_GRAMMARS} from './grammars.js';
 // 1. Setup the plugin to handle remote URLs and esm.sh redirects
 const urlResolvePlugin = {
   name: 'url-resolve-plugin',
