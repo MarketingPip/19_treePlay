@@ -1,7 +1,7 @@
 import * as esbuild from 'esbuild';
 import fs from 'fs';
 import path from 'path';
-
+import { nodeModulesPolyfillPlugin } from "esbuild-plugins-node-modules-polyfill";
 // 1. Setup the plugin to handle remote URLs and esm.sh redirects
 const urlResolvePlugin = {
   name: 'url-resolve-plugin',
@@ -71,7 +71,7 @@ async function runBuild() {
       outfile: outFile,
       platform: 'browser',
       target: 'es2022',
-      plugins: [urlResolvePlugin],
+      plugins: [nodeModulesPolyfillPlugin(), urlResolvePlugin],
       minify: false, // Set to true for a smaller production bundle
       sourcemap: true,
       // This is crucial for tree-sitter: it prevents esbuild 
