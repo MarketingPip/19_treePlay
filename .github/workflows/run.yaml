@@ -28,7 +28,7 @@ jobs:
           version: 'latest'
 
       - name: Build Package
-        run: npm build
+        run: npm run build
         
       - name: Commit and Push JS Bundles
         env:
