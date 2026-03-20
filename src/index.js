@@ -25,7 +25,10 @@ const repo = `MarketingPipeline/${pkg.name}`;
 
 const languages = BUILTIN_GRAMMARS.map(g => g.lang);
 
+
 const cdnUrls = generateCdnMap(languages, pkg.version, repo);
+
+export const languages = cdnUrls;
 
 function toAcornStyle(node, parent = null, path = []) {
   const currentPath = [...path, node.type]; // Add current node type to the breadcrumb
@@ -119,4 +122,4 @@ export async function createParser(Grammar) {
   return parser;
 }
 
-export {cdnUrls as languages}
+
