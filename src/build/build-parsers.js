@@ -135,11 +135,10 @@ async function main() {
   const mainDir = path.join(rootDir, "main")
   if (!fs.existsSync(mainDir)) fs.mkdirSync(mainDir, { recursive: true })
 
-  // ── PRE-CHECK: Skip languages already built ───────────────────────────────
+  // ── PRE-CHECK: Skip languages already built (before any npm installs) ──────
   const results = { ok: [], builtFromSource: [], failed: [], skipped: [] }
-  
+
   if (!isForce) {
-    const originalCount = targets.length
     targets = targets.filter(g => {
       const outJs = path.join(mainDir, `${g.lang}.js`)
       if (fs.existsSync(outJs)) {
@@ -149,15 +148,16 @@ async function main() {
       }
       return true
     })
-    
-    if (results.skipped.length > 0) {
-      console.log(`⏭️  Skipping ${results.skipped.length} up-to-date parsers (use --force to rebuild)`)
-    }
-  }
 
-  if (targets.length === 0) {
-    console.log("✅ All requested parsers are already built.")
-    return
+    if (results.skipped.length) {
+      console.log(`⏭️  Skipping ${results.skipped.length} already-built parser(s): ${results.skipped.join(", ")}`)
+      console.log(`   (pass --force to rebuild)`)
+    }
+
+    if (!targets.length) {
+      console.log("✅ All requested parsers are already built.")
+      return
+    }
   }
 
   const commitHash = gitHead(rootDir)
@@ -166,8 +166,8 @@ async function main() {
   // ── 1. Install tree-sitter-cli ──────────────────────────────────────────
   const cliDir = makeTmp("ts-cli-")
   console.log(`\n🔧 Installing tree-sitter-cli into ${cliDir} …`)
-  const cliRes = sh(`npm install --no-save tree-sitter-cli`, cliDir)
-  
+  sh(`npm install --no-save tree-sitter-cli`, cliDir)
+
   const cliBinName = process.platform === "win32" ? "tree-sitter.cmd" : "tree-sitter"
   const cliBin = path.join(cliDir, "node_modules", ".bin", cliBinName)
   const cliAvailable = fs.existsSync(cliBin)
@@ -176,7 +176,7 @@ async function main() {
   const grammarDir = makeTmp("ts-grammars-")
   console.log(`📦 Installing ${uniqueNpm.length} grammar package(s) …\n`)
   const grammarRes = sh(`npm install --no-save --legacy-peer-deps --ignore-scripts ${uniqueNpm.join(" ")}`, grammarDir)
-  
+
   if (grammarRes.status !== 0) {
     console.error("❌ grammar install failed")
     process.exit(1)
@@ -207,7 +207,6 @@ async function main() {
     }
 
     let wasmPath = null
-    let usedPkg = npm
     let fromSource = false
 
     const primary = resolveDirs(npm)
