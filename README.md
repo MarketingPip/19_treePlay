@@ -7,9 +7,10 @@ A lightweight, pure JavaScript library to parse, traverse, and transform source 
 
 ## ✨ Features
 
-- **Pure JS/ESM** — Works in the browser, Node.js, and Deno via `esm.sh`.
-- **Any language** — Rust, TypeScript, Python, C, HTML, CSS, JSON, YAML, TOML, Nix, Bash, and more.
-- **Acorn-style AST** — Transforms Tree-sitter's CST into simplified, walkable JSON objects with a familiar `{ type, start, end, body }` shape.
+- **Pure JS/ESM** - Works in the browser, Node.js, and Deno
+- **Bundler Friendly** - Use's a patched version of [web-tree-sitter](https://github.com/tree-sitter/tree-sitter/tree/master/lib/binding_web) by [@jeff-hykin](https://github.com/jeff-hykin/) made to be bundler-friendly.
+- **Any language** - Rust, TypeScript, Python, C, HTML, CSS, JSON, YAML, TOML, Nix, Bash, and more.
+- **Acorn-style AST** - Transforms Tree-sitter's CST into simplified, walkable JSON objects with a familiar `{ type, start, end, body }` shape.
 
 
 ## 🚀 Quick Start
@@ -75,7 +76,7 @@ Loads the Tree-sitter WASM runtime with the given grammar. Must be awaited befor
 
 ---
 
-### `parser.toAst(code)` → `AstNode`
+### `parser.parse(code)` → `AstNode`
 
 Parses source code and returns a plain, JSON-serializable AST. Each node contains:
 
