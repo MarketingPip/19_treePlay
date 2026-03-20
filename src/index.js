@@ -52,7 +52,7 @@ export async function createParser(Grammar) {
     const tree = originalParse(code, ...args);
     
     // Transform the resulting Tree/AST to Acorn style
-    return toAcornStyle(tree);
+    return toAcornStyle(tree.rootNode);
   };
 
   return parser;
