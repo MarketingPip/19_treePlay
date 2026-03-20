@@ -1,4 +1,5 @@
 import { createParser as _createParser } from "https://deno.land/x/deno_tree_sitter@1.0.1.2/main/main.js";
+import pkg from '../package.json' with { type: 'json' };
 
 function toAcornStyle(node) {
   const result = {
