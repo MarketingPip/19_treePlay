@@ -1,39 +1,28 @@
 {
   "name": "tree-sitter-wasm-factory",
   "version": "1.0.0",
+  "type": "module",
   "description": "Automated WASM build pipeline for Tree-sitter grammars",
-  "main": "./src/index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
   "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  },  
+    ".": "./dist/index.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "./src/build-vfs.js",
-    "tree-sitter": "tree-sitter",
+    "build": "node ./src/build-vfs.js",
     "build:wasm": "tree-sitter build --wasm",
     "build:all": "node build-parsers.js",
-    "clean": "find . -name '*.wasm' -delete",
-    "prebuild:all": "npm install"
+    "clean": "find . -name '*.wasm' -delete"
   },
   "devDependencies": {
-    "tree-sitter-cli": "^0.24.3"
+    "tree-sitter-cli": "^0.24.3",
+    "esbuild": "^0.20.2"
   },
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "keywords": [
-    "tree-sitter",
-    "wasm",
-    "parser",
-    "grammar"
-  ],
   "files": [
     "dist",
     "main"
   ],
-  "author": "Your Name",
-  "license": "MIT"
+  "engines": {
+    "node": ">=18.0.0"
+  }
 }
