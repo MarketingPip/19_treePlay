@@ -79,7 +79,28 @@ export function walk(node, visitors) {
   node.body?.forEach(child => walk(child, visitors));
 }
 
+export function walkWithCursor(node, visitors) {
+  const cursor = node.walk();
+  let reachedRoot = false;
 
+  while (!reachedRoot) {
+    // 1. Enter: Call the visitor for the current node
+    visitors[cursor.nodeType]?.(cursor.currentNode);
+
+    // 2. Move Depth-First
+    if (cursor.gotoFirstChild()) {
+      continue;
+    }
+
+    // 3. Move Sibling or Back up
+    while (!cursor.gotoNextSibling()) {
+      if (!cursor.gotoParent()) {
+        reachedRoot = true;
+        break;
+      }
+    }
+  }
+}
 
 export async function createParser(Grammar) {
   const parser = await _createParser(Grammar);
