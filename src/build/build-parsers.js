@@ -17,7 +17,11 @@ import { execSync, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import { dirname } from 'node:path';
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 // ─── Grammar registry ────────────────────────────────────────────────────────
 // `alts`: fallback npm packages tried in order when the primary has no
 // pre-built wasm AND fails to build (e.g. wasm-incompatible external scanner).
